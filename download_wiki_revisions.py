@@ -57,25 +57,41 @@ def find_yearmonth(revision: str) -> str:
     return extract_yearmonth(find_timestamp(revision))
 
 
-def main(page: str, limit: int, data_dir: Path):
+def main(page: str, limit: int, data_dir: Path, update: bool = True):
     """
     Downloads the main page (with revisions) for the given page title.
     Organizes the revisions into a folder structure like
     <page_name>/<year>/<month>/<revision_id>.xml
     """
-    print(f"Downloading {limit} revisions of {page} to {data_dir}")
-    raw_revisions = download_page_w_revisions(page, limit=limit)
-    validate_page(page, page_xml=raw_revisions)
-    print("Downloaded revisions. Parsing and saving...")
-    for wiki_revision in tqdm(parse_mediawiki_revisions(raw_revisions), total=limit):
-        revision_path = construct_path(
-            wiki_revision=wiki_revision, page_name=page, save_dir=data_dir
-        )
-        if not revision_path.exists():
-            revision_path.parent.mkdir(parents=True, exist_ok=True)
-        revision_path.write_text(wiki_revision)
-    
-    print("Done!") # You should call count_revisions() here and print the number of revisions
+    if update is False & data_dir.exists():
+        print("Not updating. Counting revisions...")
+    else:
+        print(f"Downloading {limit} revisions of {page} to {data_dir}")
+        raw_revisions = download_page_w_revisions(page, limit=limit)
+        validate_page(page, page_xml=raw_revisions)
+        print("Downloaded revisions. Parsing and saving...")
+        for wiki_revision in tqdm(parse_mediawiki_revisions(raw_revisions), total=limit):
+            revision_path = construct_path(
+                wiki_revision=wiki_revision, page_name=page, save_dir=data_dir
+            )
+            if not revision_path.exists():
+                revision_path.parent.mkdir(parents=True, exist_ok=True)
+            revision_path.write_text(wiki_revision)
+        
+
+            def count_files(folder_path, folders = False):
+                files_path = Path('data') / folder_path
+                total_files = 0
+                for file in Path(files_path).rglob('*'):
+                    if folders:
+                        total_files += 1
+                    else:
+                        if file.is_file():
+                            total_files += 1
+                return total_files
+
+
+    print(f"total number of files: {count_files(page)}") # You should call count_revisions() here and print the number of revisions
                    # You should also pass an 'update' argument so that you can decide whether
                    # to update and refresh or whether to simply count the revisions.   
 
@@ -108,5 +124,11 @@ if __name__ == "__main__":
         default=10,
         help="Number of revisions to download",
     )
+    parser.add_argument(
+        "--update",
+        type=bool,
+        default=True,
+        help="Whether to update the revisions or simply count them",
+    )
     args = parser.parse_args()
-    main(page=args.page, limit=args.limit, data_dir=DATA_DIR)
+    main(page=args.page, limit=args.limit, data_dir=DATA_DIR, update=args.update)
